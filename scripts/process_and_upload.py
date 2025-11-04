@@ -280,7 +280,7 @@ def main():
                 return
 
             # Update Google Sheet
-            update_google_sheet(processed_df, sheet_id, "sales_data")
+            update_google_sheet(processed_df, sheet_id, "data")
             
         except Exception as e:
             logging.error(f"Error processing file: {e}")
