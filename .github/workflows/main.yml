@@ -1,4 +1,4 @@
-name: notas_transf_up
+name: vendas_data_up
 
 on:
   workflow_dispatch: 
