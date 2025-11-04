@@ -227,6 +227,8 @@ def process_excel_data(input_file):
     
     # Create final DataFrame
     final_df = pd.DataFrame(final_rows, columns=columns)
+
+    final_df = df.dropna(how="all")
     
     logging.info(f"Step 2 complete! Total rows processed: {len(transformed_data)}")
     return final_df
