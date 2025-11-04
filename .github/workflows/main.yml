@@ -36,4 +36,5 @@ jobs:
       - name: Process and Upload to Google Sheets
         env:
           GGL_CREDENTIALS: ${{ secrets.GGL_CREDENTIALS }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python scripts/process_and_upload.py 
