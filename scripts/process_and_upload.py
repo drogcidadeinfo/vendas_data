@@ -44,56 +44,6 @@ def format_number(value):
         # Return original value if it can't be converted to number
         return value
 
-def add_totals_row(filial_data, transformed_data, filial_name):
-    """Add a totals row for a filial group"""
-    if not filial_data:
-        return
-    
-    # Initialize sums
-    sums = {
-        'DINHEIRO': 0,
-        'CHQ. VISTA': 0,
-        'CHQ. PRE': 0,
-        'CREDIÁRIO': 0,
-        'CONVÊNIO': 0,
-        'CARTÃO': 0,
-        'TOTAL VENDAS': 0,
-        'MÉDIA VENDA': 0,
-        'ACUMULADO': 0,
-        'MÉDIA DIA': 0,
-        'OUT.SAIDAS': 0
-    }
-    
-    # Calculate sums for numeric columns
-    for row in filial_data:
-        for column in sums.keys():
-            try:
-                # Remove formatting and convert to float for calculation
-                value_str = str(row[column]).replace('.', '').replace(',', '.')
-                sums[column] += float(value_str)
-            except (ValueError, TypeError):
-                continue
-    
-    # Create totals row with empty FILIAL cell
-    totals_row = {
-        'FILIAL': '',  # Empty FILIAL cell
-        'DATA': 'TOTAL:',
-        'DINHEIRO': format_number(sums['DINHEIRO']),
-        'CHQ. VISTA': format_number(sums['CHQ. VISTA']),
-        'CHQ. PRE': format_number(sums['CHQ. PRE']),
-        'CREDIÁRIO': format_number(sums['CREDIÁRIO']),
-        'CONVÊNIO': format_number(sums['CONVÊNIO']),
-        'CARTÃO': format_number(sums['CARTÃO']),
-        'TOTAL VENDAS': format_number(sums['TOTAL VENDAS']),
-        'MÉDIA VENDA': format_number(sums['MÉDIA VENDA'] / len(filial_data) if filial_data else 0),
-        'ACUMULADO': format_number(sums['ACUMULADO']),
-        'MÉDIA DIA': format_number(sums['MÉDIA DIA'] / len(filial_data) if filial_data else 0),
-        'OUT.SAIDAS': format_number(sums['OUT.SAIDAS'])
-    }
-    
-    # Add the totals row to the transformed data
-    transformed_data.append(totals_row)
-
 def process_excel_data(input_file):
     """Process the Excel file and return the final DataFrame"""
     
@@ -152,7 +102,6 @@ def process_excel_data(input_file):
     ]
     
     current_filial = None
-    current_filial_data = []  # Store data for current filial to calculate totals
     
     # Iterate through each row in the original data
     for index, row in df.iterrows():
@@ -164,12 +113,6 @@ def process_excel_data(input_file):
         
         # Check if this row contains filial information
         if cell_value.startswith('FILIAL:'):
-            # If we have data from previous filial, add totals row
-            if current_filial and current_filial_data:
-                # Add totals row for previous filial
-                add_totals_row(current_filial_data, transformed_data, current_filial)
-                current_filial_data = []  # Reset for new filial
-            
             current_filial = cell_value
             continue
             
@@ -202,11 +145,6 @@ def process_excel_data(input_file):
                 'OUT.SAIDAS': format_number(row[11])
             }
             transformed_data.append(data_row)
-            current_filial_data.append(data_row)  # Store for totals calculation
-    
-    # Add totals for the last filial
-    if current_filial and current_filial_data:
-        add_totals_row(current_filial_data, transformed_data, current_filial)
     
     # Create DataFrame from transformed data
     result_df = pd.DataFrame(transformed_data, columns=columns)
