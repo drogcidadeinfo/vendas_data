@@ -66,9 +66,9 @@ try:
     time.sleep(5)
 
     # verifica se o pop-up esta presente e clica se ele existir
-    popup_element = driver.find_element(By.ID, "modalMsgMovimentacaoAnvisa") 
+    """popup_element = driver.find_element(By.ID, "modalMsgMovimentacaoAnvisa") 
     if popup_element:
-        driver.find_element(By.ID, "sairModalMsgMovimentos").click()
+        driver.find_element(By.ID, "sairModalMsgMovimentos").click()"""
 
     # Access "Vendas por Data"
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "sideMenuSearch")))
