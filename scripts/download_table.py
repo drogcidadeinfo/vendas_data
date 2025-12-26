@@ -65,6 +65,8 @@ try:
     WebDriverWait(driver, 10).until(lambda x: x.execute_script("return document.readyState === 'complete'"))
     time.sleep(5)
 
+    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.F11)
+
     # verifica se o pop-up esta presente e clica se ele existir
     """popup_element = driver.find_element(By.ID, "modalMsgMovimentacaoAnvisa") 
     if popup_element:
