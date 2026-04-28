@@ -171,7 +171,7 @@ def update_google_sheet(df, sheet_id, worksheet_name="data"):
         df_to_append = df
     
     # Sort by FILIAL before appending
-    df_to_append = df_to_append.sort_values(by=['FILIAL', 'DATA'])
+    # df_to_append = df_to_append.sort_values(by=['FILIAL', 'DATA'])
     
     # Prepare rows for appending
     rows = df_to_append.values.tolist()
