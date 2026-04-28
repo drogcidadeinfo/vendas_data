@@ -87,7 +87,7 @@ def process_excel_data(input_file):
     logging.info(f"Final DataFrame shape: {df.shape}")
     return df
 
-def update_google_sheet(df, sheet_id, worksheet_name="data"):
+'''def update_google_sheet(df, sheet_id, worksheet_name="data"):
     """Update Google Sheet with the processed data"""
     logging.info("Checking Google credentials environment variable...")
     creds_json = os.getenv("GGL_CREDENTIALS")
@@ -118,6 +118,81 @@ def update_google_sheet(df, sheet_id, worksheet_name="data"):
     sheet.clear()
     logging.info("Uploading new data...")
     retry_api_call(lambda: sheet.update(rows))
+    logging.info("Google Sheet updated successfully.")'''
+
+def update_google_sheet(df, sheet_id, worksheet_name="data"):
+    """Append new data to Google Sheet (avoiding duplicates)"""
+    logging.info("Checking Google credentials environment variable...")
+    creds_json = os.getenv("GGL_CREDENTIALS")
+    if creds_json is None:
+        logging.error("Google credentials not found in environment variables.")
+        return
+
+    creds_dict = json.loads(creds_json)
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    client = gspread.authorize(creds)
+    
+    # Open spreadsheet and worksheet
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+        sheet = spreadsheet.worksheet(worksheet_name)
+    except Exception as e:
+        logging.error(f"Error accessing spreadsheet: {e}")
+        return
+
+    # Prepare new data
+    logging.info("Preparing data for Google Sheets...")
+    df = df.fillna("")  # Ensure no NaN values
+    
+    # Get existing data to check for duplicates
+    existing_data = sheet.get_all_values()
+    
+    if len(existing_data) > 1:  # Has header and data
+        existing_df = pd.DataFrame(existing_data[1:], columns=existing_data[0])
+        
+        # Create a unique key for comparison (e.g., FILIAL + DATA)
+        df['unique_key'] = df['FILIAL'].astype(str) + '_' + df['DATA'].astype(str)
+        existing_df['unique_key'] = existing_df['FILIAL'].astype(str) + '_' + existing_df['DATA'].astype(str)
+        
+        # Filter out rows that already exist
+        new_rows = df[~df['unique_key'].isin(existing_df['unique_key'])].copy()
+        new_rows = new_rows.drop(columns=['unique_key'])
+        
+        logging.info(f"Found {len(df)} total rows, {len(new_rows)} new rows to append")
+        
+        if len(new_rows) == 0:
+            logging.info("No new data to append. All records already exist.")
+            return
+        
+        df_to_append = new_rows
+    else:
+        # Sheet is empty or has only headers
+        df_to_append = df
+    
+    # Sort by FILIAL before appending
+    df_to_append = df_to_append.sort_values(by=['FILIAL', 'DATA'])
+    
+    # Prepare rows for appending
+    rows = df_to_append.values.tolist()
+    
+    if len(existing_data) <= 1:
+        # If sheet is empty, add headers too
+        headers = df_to_append.columns.tolist()
+        rows = [headers] + rows
+    
+    # Append data to sheet
+    logging.info(f"Appending {len(df_to_append)} rows to Google Sheet...")
+    
+    if len(existing_data) <= 1:
+        # Clear and update for first upload
+        sheet.clear()
+        retry_api_call(lambda: sheet.update(rows))
+    else:
+        # Append only new rows (without headers)
+        if rows:
+            retry_api_call(lambda: sheet.append_rows(rows))
+    
     logging.info("Google Sheet updated successfully.")
 
 def main():
