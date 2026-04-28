@@ -54,7 +54,8 @@ def process_excel_data(input_file):
     
     # Handle branch information
     branch_mask = df['DATA'].str.contains('FILIAL:', na=False)
-    df['FILIAL'] = df['DATA'].where(branch_mask)
+    # df['FILIAL'] = df['DATA'].where(branch_mask)
+    df['FILIAL'] = df['DATA'].where(branch_mask).str.replace(r'^FILIAL:\s*\d+\s+', '', regex=True)
     df['FILIAL'] = df['FILIAL'].ffill()
     
     # Remove branch rows and keep only data rows
