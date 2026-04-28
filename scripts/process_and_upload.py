@@ -33,17 +33,6 @@ def retry_api_call(func, retries=3, delay=2):
                 raise
     raise Exception("Max retries reached.")
 
-def format_number(value):
-    """Format numbers to have two decimal places"""
-    try:
-        # Convert to float first to handle both strings and numbers
-        num_value = float(value)
-        # Format to always show two decimal places
-        return f"{num_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    except (ValueError, TypeError):
-        # Return original value if it can't be converted to number
-        return value
-
 def process_excel_data(input_file):
     """Process the Excel file and return the final DataFrame"""
     
@@ -51,122 +40,29 @@ def process_excel_data(input_file):
     logging.info("Step 1: Performing initial data cleaning...")
     
     # Read the Excel file
-    df = pd.read_excel(input_file)
+    df = pd.read_excel(input_file, header=0)
     
     # Drop the first column
-    df = df.drop(df.columns[0], axis=1)
+    df = df.drop(columns=['Unnamed: 0', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 5', 'Unnamed: 6', 'Unnamed: 8', 
+                      'Unnamed: 10', 'Unnamed: 12', 'Unnamed: 19'])
     
-    # keep only selected columns
-    df = df[["DATA", "Unnamed: 2", "Unnamed: 3", "DINHEIRO", "CHQ. VISTA", "CHQ. PRE", "CREDIÁRIO", "CONVÊNIO",
-             "CARTÃO", "TOTAL VENDAS", "MÉDIA VENDA", "ACUMULADO", "MÉDIA DIA", "Unnamed: 19", "OUT.SAIDAS "]]
+    df = df.dropna(subset=['DATA'])
+
+    branch_mask = df['DATA'].str.contains('FILIAL:', na=False)
+
+    df['FILIAL'] = df['DATA'].where(branch_mask)
+
+    df['FILIAL'] = df['FILIAL'].ffill()
+
+    df = df[~branch_mask].copy()
+
+    df['DATA'] = pd.to_datetime(df['DATA'])
+
+    # Convert to DD/MM/YYYY format
+    df['DATA'] = df['DATA'].dt.strftime('%d/%m/%Y')
+
+    final_df = final_df[['FILIAL', 'DATA', 'DINHEIRO', 'CHQ. VISTA', 'CHQ. PRE', 'CREDIÁRIO', 'CONVÊNIO', 'CARTÃO', 'TOTAL VENDAS', 'MÉDIA VENDA', 'ACUMULADO', 'MÉDIA DIA', 'OUT.SAIDAS ']]
     
-    # find indexes where 2nd column == 'TOTAL FILIAL:' or 'TOTAL GERAL:'
-    target_indexes = df.index[df.iloc[:, 1].isin(["TOTAL FILIAL:", "TOTAL GERAL:"])].tolist()
-    
-    # collect all rows to delete (the row itself + the two below)
-    rows_to_drop = []
-    for idx in target_indexes:
-        rows_to_drop.extend([idx, idx + 1, idx + 2])
-    
-    # drop those rows (ignore errors for indexes that may not exist)
-    df = df.drop(rows_to_drop, errors="ignore")
-    
-    # reset index after deletion
-    df = df.reset_index(drop=True)
-    
-    # list the column names you want to remove
-    cols_to_drop = ["Unnamed: 2", "Unnamed: 3", "Unnamed: 19"]
-    
-    # drop only those columns if they exist
-    df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
-    
-    # Save to intermediate Excel file (optional, for debugging)
-    intermediate_file = "intermediate_output.xlsx"
-    df.to_excel(intermediate_file, index=False)
-    logging.info(f"Step 1 complete! Intermediate file saved as '{intermediate_file}'")
-    
-    # STEP 2: Transform data to the desired format
-    logging.info("Step 2: Transforming data to final format...")
-    
-    # Read the intermediate Excel file
-    df = pd.read_excel(intermediate_file, header=None)
-    
-    # Initialize lists to store the transformed data
-    transformed_data = []
-    
-    # Define the column names based on the second format
-    columns = [
-        'FILIAL', 'DATA', 'DINHEIRO', 'CHQ. VISTA', 'CHQ. PRE', 
-        'CREDIÁRIO', 'CONVÊNIO', 'CARTÃO', 'TOTAL VENDAS', 
-        'MÉDIA VENDA', 'ACUMULADO', 'MÉDIA DIA', 'OUT.SAIDAS'
-    ]
-    
-    current_filial = None
-    
-    # Iterate through each row in the original data
-    for index, row in df.iterrows():
-        # Skip empty rows
-        if pd.isna(row[0]):
-            continue
-            
-        cell_value = str(row[0])
-        
-        # Check if this row contains filial information
-        if cell_value.startswith('FILIAL:'):
-            current_filial = cell_value
-            continue
-            
-        # Check if this row contains date information (starts with '2025')
-        if cell_value.startswith('2025'):
-            # Convert date format from '2025-11-01 00:00:00' to '01/11/2025'
-            try:
-                # Parse the original date string
-                original_date = datetime.strptime(cell_value, '%Y-%m-%d %H:%M:%S')
-                # Format to dd/mm/yyyy
-                formatted_date = original_date.strftime('%d/%m/%Y')
-            except ValueError:
-                # If parsing fails, keep the original value
-                formatted_date = cell_value
-            
-            # Extract all data values and format numeric ones
-            data_row = {
-                'FILIAL': current_filial,
-                'DATA': formatted_date,  # Use the formatted date
-                'DINHEIRO': format_number(row[1]),
-                'CHQ. VISTA': format_number(row[2]),
-                'CHQ. PRE': format_number(row[3]),
-                'CREDIÁRIO': format_number(row[4]),
-                'CONVÊNIO': format_number(row[5]),
-                'CARTÃO': format_number(row[6]),
-                'TOTAL VENDAS': format_number(row[7]),
-                'MÉDIA VENDA': format_number(row[8]),
-                'ACUMULADO': format_number(row[9]),
-                'MÉDIA DIA': format_number(row[10]),
-                'OUT.SAIDAS': format_number(row[11])
-            }
-            transformed_data.append(data_row)
-    
-    # Create DataFrame from transformed data
-    result_df = pd.DataFrame(transformed_data, columns=columns)
-    
-    # Add empty rows between different filials (optional, to match the exact format)
-    final_rows = []
-    previous_filial = None
-    
-    for index, row in result_df.iterrows():
-        current_filial = row['FILIAL']
-        
-        # Add empty row when filial changes
-        if previous_filial is not None and current_filial != previous_filial:
-            final_rows.append({col: '' for col in columns})
-        
-        final_rows.append(row.to_dict())
-        previous_filial = current_filial
-    
-    # Create final DataFrame
-    final_df = pd.DataFrame(final_rows, columns=columns)
-    
-    logging.info(f"Step 2 complete! Total rows processed: {len(transformed_data)}")
     return final_df
 
 def update_google_sheet(df, sheet_id, worksheet_name="data"):
