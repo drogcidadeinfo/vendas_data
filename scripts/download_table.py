@@ -90,8 +90,8 @@ try:
     time.sleep(5)
 
     # Fill in start and end dates
-    driver.find_element(By.ID, "dat_inicio").send_keys("01042025")
-    driver.find_element(By.ID, "dat_fim").send_keys("31052025")
+    driver.find_element(By.ID, "dat_inicio").send_keys("01062025")
+    driver.find_element(By.ID, "dat_fim").send_keys("31072025")
     time.sleep(5)
 
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "selI_1"))).click()
