@@ -162,7 +162,7 @@ def process_excel_data(input_file):
     
     logging.info("Google Sheet updated successfully.")'''
 
-def update_google_sheet(df, sheet_id, worksheet_name="data"):
+'''def update_google_sheet(df, sheet_id, worksheet_name="data"):
     """Delete today's rows from sheet, then append all new data"""
     logging.info("Checking Google credentials...")
     creds_json = os.getenv("GGL_CREDENTIALS")
@@ -242,7 +242,96 @@ def update_google_sheet(df, sheet_id, worksheet_name="data"):
     
     logging.info(f"Sheet updated: {len(final_rows)} total rows")
     logging.info(f"  - {len(rows_to_keep)} rows kept from previous days")
-    logging.info(f"  - {len(new_rows)} rows added/updated for today")
+    logging.info(f"  - {len(new_rows)} rows added/updated for today")'''
+
+def update_google_sheet(df, sheet_id, worksheet_name="data"):
+    """Update today and yesterday - only if changed"""
+    logging.info("Checking Google credentials...")
+    creds_json = os.getenv("GGL_CREDENTIALS")
+    if creds_json is None:
+        logging.error("Google credentials not found.")
+        return
+
+    creds_dict = json.loads(creds_json)
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    client = gspread.authorize(creds)
+    
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+        sheet = spreadsheet.worksheet(worksheet_name)
+    except Exception as e:
+        logging.error(f"Error accessing spreadsheet: {e}")
+        return
+
+    today = datetime.now().strftime('%d/%m/%Y')
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%d/%m/%Y')
+    
+    logging.info(f"Checking data for {yesterday} and {today}")
+    
+    # Get existing data
+    existing_data = sheet.get_all_values()
+    
+    if len(existing_data) <= 1:
+        # First upload
+        df = df.fillna("")
+        df = df.sort_values(by=['FILIAL', 'DATA'])
+        rows = [df.columns.tolist()] + df.values.tolist()
+        sheet.update(rows)
+        logging.info(f"Initial upload: {len(df)} rows")
+        return
+    
+    headers = existing_data[0]
+    
+    # Create DataFrame from existing data
+    existing_df = pd.DataFrame(existing_data[1:], columns=headers)
+    
+    # Get new data for yesterday and today
+    new_relevant = df[df['DATA'].isin([today, yesterday])].copy()
+    
+    if new_relevant.empty:
+        logging.info("No new data for yesterday or today. Skipping update.")
+        return
+    
+    # Check if data actually changed
+    existing_relevant = existing_df[existing_df['DATA'].isin([today, yesterday])].copy()
+    
+    # Create unique keys for comparison
+    new_relevant['unique_key'] = new_relevant['FILIAL'].astype(str) + '_' + new_relevant['DATA'].astype(str)
+    existing_relevant['unique_key'] = existing_relevant['FILIAL'].astype(str) + '_' + existing_relevant['DATA'].astype(str)
+    
+    # Check for differences
+    new_keys = set(new_relevant['unique_key'])
+    existing_keys = set(existing_relevant['unique_key'])
+    
+    if new_keys == existing_keys:
+        logging.info("Data for yesterday/today unchanged. Skipping update.")
+        return
+    
+    logging.info(f"Changes detected! Updating...")
+    logging.info(f"  - New keys: {len(new_keys - existing_keys)}")
+    logging.info(f"  - Removed keys: {len(existing_keys - new_keys)}")
+    
+    # Delete old rows for yesterday/today
+    rows_to_delete = []
+    for i, row in enumerate(existing_data[1:], start=2):
+        if len(row) > headers.index('DATA'):
+            if row[headers.index('DATA')] in [today, yesterday]:
+                rows_to_delete.append(i)
+    
+    for row_num in reversed(rows_to_delete):
+        sheet.delete_rows(row_num)
+    
+    # Append new data (all of it, not just yesterday/today)
+    df = df.fillna("")
+    df = df.sort_values(by=['FILIAL', 'DATA'])
+    rows_to_append = df.values.tolist()
+    
+    if rows_to_append:
+        sheet.append_rows(rows_to_append)
+        logging.info(f"Appended {len(rows_to_append)} total rows")
+    
+    logging.info("Update complete!")
 
 def main():
     download_dir = '/home/runner/work/vendas_data/vendas_data/'
