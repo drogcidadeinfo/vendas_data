@@ -24,7 +24,7 @@ if not username or not password:
 # --- DATE LOGIC: just get current day ---
 today = datetime.now()
 current_day = today.strftime("%d%m%Y")  
-yesterday = (datetime.now() - timedelta(days=1)).strftime("%d%m%Y"")
+yesterday = (datetime.now() - timedelta(days=1)).strftime("%d%m%Y")
 
 logging.info(f"Date set to: {yesterday} / {current_day}")
 
