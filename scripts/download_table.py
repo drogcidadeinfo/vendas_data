@@ -21,14 +21,11 @@ password = os.getenv("password")
 if not username or not password:
     raise ValueError("Environment variables 'USER_NAME' and/or 'USER_PASSWORD' not set.")
 
-# --- DATE LOGIC: get from 1st of current month until today ---
+# --- DATE LOGIC: just get current day ---
 today = datetime.now()
-first_day_of_month = today.replace(day=1)
+data = today.strftime("%d%m%Y")  # current day
 
-inicio = first_day_of_month.strftime("%d%m%Y")  # always 1st day of current month
-fim = today.strftime("%d%m%Y")  # current day
-
-logging.info(f"Using date range: {inicio} to {fim}")
+logging.info(f"Date set to: {data}")
 
 # --- DOWNLOAD DIRECTORY ---
 download_dir = os.getcwd()
@@ -90,8 +87,8 @@ try:
     time.sleep(5)
 
     # Fill in start and end dates
-    driver.find_element(By.ID, "dat_inicio").send_keys("01042026")
-    driver.find_element(By.ID, "dat_fim").send_keys("28042026")
+    driver.find_element(By.ID, "dat_inicio").send_keys(data)
+    driver.find_element(By.ID, "dat_fim").send_keys(data)
     time.sleep(5)
 
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "selI_1"))).click()
