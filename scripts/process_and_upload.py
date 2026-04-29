@@ -88,39 +88,6 @@ def process_excel_data(input_file):
     return df
 
 '''def update_google_sheet(df, sheet_id, worksheet_name="data"):
-    """Update Google Sheet with the processed data"""
-    logging.info("Checking Google credentials environment variable...")
-    creds_json = os.getenv("GGL_CREDENTIALS")
-    if creds_json is None:
-        logging.error("Google credentials not found in environment variables.")
-        return
-
-    creds_dict = json.loads(creds_json)
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    client = gspread.authorize(creds)
-    
-    # Open spreadsheet and worksheet
-    try:
-        spreadsheet = client.open_by_key(sheet_id)
-        sheet = spreadsheet.worksheet(worksheet_name)
-    except Exception as e:
-        logging.error(f"Error accessing spreadsheet: {e}")
-        return
-
-    # Prepare data
-    logging.info("Preparing data for Google Sheets...")
-    df = df.fillna("")  # Ensure no NaN values
-    rows = [df.columns.tolist()] + df.values.tolist()
-
-    # Clear sheet and update
-    logging.info("Clearing existing data...")
-    sheet.clear()
-    logging.info("Uploading new data...")
-    retry_api_call(lambda: sheet.update(rows))
-    logging.info("Google Sheet updated successfully.")'''
-
-def update_google_sheet(df, sheet_id, worksheet_name="data"):
     """Append new data to Google Sheet (avoiding duplicates)"""
     logging.info("Checking Google credentials environment variable...")
     creds_json = os.getenv("GGL_CREDENTIALS")
@@ -193,7 +160,69 @@ def update_google_sheet(df, sheet_id, worksheet_name="data"):
         if rows:
             retry_api_call(lambda: sheet.append_rows(rows))
     
-    logging.info("Google Sheet updated successfully.")
+    logging.info("Google Sheet updated successfully.")'''
+
+def update_google_sheet(df, sheet_id, worksheet_name="data"):
+    """Simpler approach: Remove current day's rows, then append all new data"""
+    logging.info("Checking Google credentials...")
+    creds_json = os.getenv("GGL_CREDENTIALS")
+    if creds_json is None:
+        logging.error("Google credentials not found.")
+        return
+
+    creds_dict = json.loads(creds_json)
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    client = gspread.authorize(creds)
+    
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+        sheet = spreadsheet.worksheet(worksheet_name)
+    except Exception as e:
+        logging.error(f"Error accessing spreadsheet: {e}")
+        return
+
+    df = df.fillna("")
+    today_date = datetime.now().strftime('%d/%m/%Y')
+    logging.info(f"Today's date: {today_date}")
+    
+    # Get existing data
+    existing_data = sheet.get_all_values()
+    
+    if len(existing_data) <= 1:
+        # First upload
+        headers = df.columns.tolist()
+        rows = [headers] + df.values.tolist()
+        sheet.clear()
+        sheet.update(rows)
+        logging.info(f"Initial upload: {len(df)} rows")
+        return
+    
+    # Separate today's data from rest
+    today_data = df[df['DATA'] == today_date].copy()
+    other_data = df[df['DATA'] != today_date].copy()
+    
+    # Keep existing data that is NOT from today
+    existing_df = pd.DataFrame(existing_data[1:], columns=existing_data[0])
+    keep_existing = existing_df[existing_df['DATA'] != today_date]
+    
+    # Combine: old data (excluding today) + new today data + other new dates
+    final_data = pd.concat([keep_existing, today_data, other_data], ignore_index=True)
+    
+    # Remove duplicates from other_data (in case they already exist)
+    final_data['unique_key'] = final_data['FILIAL'].astype(str) + '_' + final_data['DATA'].astype(str)
+    final_data = final_data.drop_duplicates(subset=['unique_key'], keep='last')
+    final_data = final_data.drop(columns=['unique_key'])
+    
+    # Sort
+    final_data = final_data.sort_values(by=['FILIAL', 'DATA'])
+    
+    # Upload everything
+    rows = [final_data.columns.tolist()] + final_data.values.tolist()
+    sheet.clear()
+    sheet.update(rows)
+    
+    logging.info(f"Sheet updated: {len(final_data)} total rows (replaced today's data)")
 
 def main():
     download_dir = '/home/runner/work/vendas_data/vendas_data/'
