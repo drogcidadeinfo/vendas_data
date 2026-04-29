@@ -162,7 +162,7 @@ def process_excel_data(input_file):
     
     logging.info("Google Sheet updated successfully.")'''
 
-'''def update_google_sheet(df, sheet_id, worksheet_name="data"):
+def update_google_sheet(df, sheet_id, worksheet_name="data"):
     """Delete today's rows from sheet, then append all new data"""
     logging.info("Checking Google credentials...")
     creds_json = os.getenv("GGL_CREDENTIALS")
@@ -182,9 +182,13 @@ def process_excel_data(input_file):
         logging.error(f"Error accessing spreadsheet: {e}")
         return
 
-    # Get today's date
-    today_date = datetime.now().strftime('%d/%m/%Y')
+    # Get the dates
+    today = datetime.now()
+    today_date = today.strftime('%d/%m/%Y')
+    yesterday_date = (today - timedelta(days=1)).strftime('%d/%m/%Y')
+    
     logging.info(f"Today's date: {today_date}")
+    logging.info(f"Yesterday's date: {yesterday_date}")
     
     # Get all existing data
     existing_data = sheet.get_all_values()
@@ -211,12 +215,18 @@ def process_excel_data(input_file):
     # Filter out today's rows
     rows_to_keep = []
     rows_deleted = 0
-    
+
     for row in data_rows:
-        if len(row) > data_col_idx and row[data_col_idx] != today_date:
+        if len(row) > data_col_idx and row[data_col_idx] not in (today_date, yesterday_date):
             rows_to_keep.append(row)
         else:
             rows_deleted += 1
+    
+    '''for row in data_rows:
+        if len(row) > data_col_idx and row[data_col_idx] != today_date:
+            rows_to_keep.append(row)
+        else:
+            rows_deleted += 1'''
     
     logging.info(f"Deleted {rows_deleted} rows from today")
     logging.info(f"Keeping {len(rows_to_keep)} rows from other dates")
@@ -242,9 +252,9 @@ def process_excel_data(input_file):
     
     logging.info(f"Sheet updated: {len(final_rows)} total rows")
     logging.info(f"  - {len(rows_to_keep)} rows kept from previous days")
-    logging.info(f"  - {len(new_rows)} rows added/updated for today")'''
+    logging.info(f"  - {len(new_rows)} rows added/updated for today")
 
-def update_google_sheet(df, sheet_id, worksheet_name="data"):
+'''def update_google_sheet(df, sheet_id, worksheet_name="data"):
     """Update today and yesterday - only if changed"""
     logging.info("Checking Google credentials...")
     creds_json = os.getenv("GGL_CREDENTIALS")
@@ -331,7 +341,7 @@ def update_google_sheet(df, sheet_id, worksheet_name="data"):
         sheet.append_rows(rows_to_append)
         logging.info(f"Appended {len(rows_to_append)} total rows")
     
-    logging.info("Update complete!")
+    logging.info("Update complete!")'''
 
 def main():
     download_dir = '/home/runner/work/vendas_data/vendas_data/'
