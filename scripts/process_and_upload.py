@@ -5,7 +5,7 @@ import json
 import time
 import logging
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 from googleapiclient.errors import HttpError
 from openpyxl.styles import Font
