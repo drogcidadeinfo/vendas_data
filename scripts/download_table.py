@@ -23,9 +23,10 @@ if not username or not password:
 
 # --- DATE LOGIC: just get current day ---
 today = datetime.now()
-data = today.strftime("%d%m%Y")  # current day
+current_day = today.strftime("%d%m%Y")  
+yesterday = (datetime.now() - timedelta(days=1)).strftime('%d/%m/%Y')
 
-logging.info(f"Date set to: {data}")
+logging.info(f"Date set to: {yesterday}/{current_day}")
 
 # --- DOWNLOAD DIRECTORY ---
 download_dir = os.getcwd()
@@ -87,8 +88,8 @@ try:
     time.sleep(5)
 
     # Fill in start and end dates
-    driver.find_element(By.ID, "dat_inicio").send_keys(data)
-    driver.find_element(By.ID, "dat_fim").send_keys(data)
+    driver.find_element(By.ID, "dat_inicio").send_keys(yesterday)
+    driver.find_element(By.ID, "dat_fim").send_keys(current_day)
     time.sleep(5)
 
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "selI_1"))).click()
