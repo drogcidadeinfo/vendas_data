@@ -163,7 +163,7 @@ def process_excel_data(input_file):
     logging.info("Google Sheet updated successfully.")'''
 
 def update_google_sheet(df, sheet_id, worksheet_name="data"):
-    """Simpler approach: Remove current day's rows, then append all new data"""
+    """Delete today's rows from sheet, then append all new data"""
     logging.info("Checking Google credentials...")
     creds_json = os.getenv("GGL_CREDENTIALS")
     if creds_json is None:
@@ -182,47 +182,67 @@ def update_google_sheet(df, sheet_id, worksheet_name="data"):
         logging.error(f"Error accessing spreadsheet: {e}")
         return
 
-    df = df.fillna("")
+    # Get today's date
     today_date = datetime.now().strftime('%d/%m/%Y')
     logging.info(f"Today's date: {today_date}")
     
-    # Get existing data
+    # Get all existing data
     existing_data = sheet.get_all_values()
     
     if len(existing_data) <= 1:
-        # First upload
-        headers = df.columns.tolist()
-        rows = [headers] + df.values.tolist()
-        sheet.clear()
+        # Sheet is empty or has only headers - just upload everything
+        df = df.fillna("")
+        rows = [df.columns.tolist()] + df.values.tolist()
         sheet.update(rows)
         logging.info(f"Initial upload: {len(df)} rows")
         return
     
-    # Separate today's data from rest
-    today_data = df[df['DATA'] == today_date].copy()
-    other_data = df[df['DATA'] != today_date].copy()
+    # Find rows to keep (all rows NOT from today)
+    headers = existing_data[0]
+    data_rows = existing_data[1:]
     
-    # Keep existing data that is NOT from today
-    existing_df = pd.DataFrame(existing_data[1:], columns=existing_data[0])
-    keep_existing = existing_df[existing_df['DATA'] != today_date]
+    # Find index of DATA column
+    try:
+        data_col_idx = headers.index('DATA')
+    except ValueError:
+        logging.error("DATA column not found in sheet")
+        return
     
-    # Combine: old data (excluding today) + new today data + other new dates
-    final_data = pd.concat([keep_existing, today_data, other_data], ignore_index=True)
+    # Filter out today's rows
+    rows_to_keep = []
+    rows_deleted = 0
     
-    # Remove duplicates from other_data (in case they already exist)
-    final_data['unique_key'] = final_data['FILIAL'].astype(str) + '_' + final_data['DATA'].astype(str)
-    final_data = final_data.drop_duplicates(subset=['unique_key'], keep='last')
-    final_data = final_data.drop(columns=['unique_key'])
+    for row in data_rows:
+        if len(row) > data_col_idx and row[data_col_idx] != today_date:
+            rows_to_keep.append(row)
+        else:
+            rows_deleted += 1
     
-    # Sort
-    final_data = final_data.sort_values(by=['FILIAL', 'DATA'])
+    logging.info(f"Deleted {rows_deleted} rows from today")
+    logging.info(f"Keeping {len(rows_to_keep)} rows from other dates")
     
-    # Upload everything
-    rows = [final_data.columns.tolist()] + final_data.values.tolist()
+    # Prepare new data (already cleaned and formatted)
+    df = df.fillna("")
+    new_rows = df.values.tolist()
+    
+    # Combine: kept rows + new rows
+    final_rows = rows_to_keep + new_rows
+    
+    # Sort by FILIAL then DATA
+    # Convert to DataFrame for easy sorting
+    if final_rows:
+        final_df = pd.DataFrame(final_rows, columns=headers)
+        final_df = final_df.sort_values(by=['FILIAL', 'DATA'])
+        final_rows = final_df.values.tolist()
+    
+    # Update sheet
+    all_rows = [headers] + final_rows
     sheet.clear()
-    sheet.update(rows)
+    sheet.update(all_rows)
     
-    logging.info(f"Sheet updated: {len(final_data)} total rows (replaced today's data)")
+    logging.info(f"Sheet updated: {len(final_rows)} total rows")
+    logging.info(f"  - {len(rows_to_keep)} rows kept from previous days")
+    logging.info(f"  - {len(new_rows)} rows added/updated for today")
 
 def main():
     download_dir = '/home/runner/work/vendas_data/vendas_data/'
